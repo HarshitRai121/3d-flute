@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ethereal Flute</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <style>
+    body{margin:0;overflow:hidden;font-family:'Inter',sans-serif;cursor:grab;user-select:none;touch-action:none;background-color:#0c0c15;color:#e5e7eb}
+    body:active{cursor:grabbing}
+    #fluteCanvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-2}
+    .ui-container{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+    .ui-panel{pointer-events:auto;backdrop-filter:blur(10px);background:rgba(10,10,20,.6);border:1px solid rgba(255,255,255,.2);box-shadow:0 4px 30px rgba(0,0,0,.1);border-radius:1.5rem}
+    .start-button{pointer-events:auto;background:linear-gradient(135deg,#22d3ee,#0ea5e9);color:#0c0c15;padding:.75rem 1.5rem;font-weight:600;border-radius:9999px;box-shadow:0 4px 14px rgba(34,211,238,.6);transition:transform .2s,box-shadow .2s;cursor:pointer}
+    .start-button:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(34,211,238,.8)}
+    .message-box{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10}
+    .title-main{position:absolute;top:2rem;width:100%;text-align:center;font-size:2.5rem;font-weight:700;color:#e5e7eb;text-shadow:0 0 10px rgba(255,255,255,.2);z-index:5}
+    @media (max-width:640px){.title-main{font-size:1.5rem;top:1rem}}
+    .note-display-container{position:absolute;top:6rem;left:50%;transform:translateX(-50%);pointer-events:none;text-align:center;z-index:5}
+    @media (max-width:640px){.note-display-container{top:4rem}}
+    .controls-wrapper{position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;pointer-events:auto;padding:1rem;border-radius:9999px;background:rgba(10,10,20,.6);border:1px solid rgba(255,255,255,.2);box-shadow:0 4px 30px rgba(0,0,0,.1),0 0 10px rgba(34,211,238,.3)}
+    .control-button{padding:.5rem 1rem;border-radius:9999px;color:#fff;transition:transform .2s,box-shadow .2s;cursor:pointer;font-weight:600;white-space:nowrap}
+    .control-button:hover{transform:translateY(-2px)}
+    .record-active{background:linear-gradient(135deg,#ef4444,#dc2626);box-shadow:0 4px 14px rgba(239,68,68,.6);animation:pulse-red 1.5s infinite}
+    .record-inactive{background:linear-gradient(135deg,#f87171,#ef4444);box-shadow:0 4px 14px rgba(248,113,113,.6)}
+    .play-button{background:linear-gradient(135deg,#34d399,#10b981);box-shadow:0 4px 14px rgba(52,211,153,.6)}
+    .stop-button{background:linear-gradient(135deg,#f97316,#ea580c);box-shadow:0 4px 14px rgba(249,115,22,.6)}
+    .save-button{background:linear-gradient(135deg,#3b82f6,#2563eb);box-shadow:0 4px 14px rgba(59,130,246,.6)}
+    .load-button{background:linear-gradient(135deg,#8b5cf6,#7c3aed);box-shadow:0 4px 14px rgba(139,92,246,.6)}
+    .info-message{position:absolute;top:10%;left:50%;transform:translateX(-50%);font-size:1.25rem;font-weight:500;color:#22d3ee;text-shadow:0 0 8px rgba(34,211,238,.8);pointer-events:none;opacity:0;transition:opacity .5s ease-in-out;white-space:nowrap}
+    @media (max-width:640px){.info-message{font-size:1rem}}
+    .instruction-message{position:absolute;top:25%;left:50%;transform:translateX(-50%);font-size:1.25rem;font-weight:500;color:#d1d5db;text-shadow:0 0 8px rgba(0,0,0,.5);pointer-events:none;opacity:1;transition:opacity 1s ease-in-out;text-align:center}
+    @media (max-width:640px){.instruction-message{font-size:1rem;top:20%}}
+    .modal{position:fixed;top:0;left:0;width:100%;height:100%;background-color:rgba(0,0,0,.8);display:none;justify-content:center;align-items:center;z-index:100}
+    .modal-content{background:#111827;padding:1.5rem;border-radius:1rem;width:90%;max-width:500px;border:1px solid #374151;color:#e5e7eb}
+    @media (max-width:640px){.modal-content{padding:1rem}}
+    .modal-title{font-size:1.5rem;font-weight:700;margin-bottom:1rem;color:#60a5fa}
+    @media (max-width:640px){.modal-title{font-size:1.25rem}}
+    .modal-input{width:100%;padding:.75rem;background:#1f2937;border:1px solid #4b5563;border-radius:.5rem;color:#fff;margin-bottom:1rem}
+    .modal-buttons{display:flex;justify-content:flex-end;gap:1rem}
+    .list-item{display:flex;justify-content:space-between;align-items:center;padding:.75rem;border-bottom:1px solid #374151;cursor:pointer;transition:background-color .2s;border-radius:.5rem}
+    .list-item:hover{background-color:#1f2937}
+    .delete-button{background:none;border:none;cursor:pointer;color:#ef4444;padding:.25rem;transition:transform .2s}
+    .delete-button:hover{transform:scale(1.1)}
+    @keyframes pulse-red{0%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+    .size-control{position:absolute;bottom:15rem;left:50%;transform:translateX(-50%);width:80%;max-width:200px;display:flex;flex-direction:column;align-items:center;gap:.5rem}
+    .size-slider{-webkit-appearance:none;width:100%;height:8px;background:#4b5563;outline:none;border-radius:4px;cursor:pointer;transition:background .2s ease}
+    .size-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;background:#22d3ee;border-radius:50%;cursor:grab}
+    .size-slider::-webkit-slider-thumb:active{cursor:grabbing}
+    .size-slider-label{font-size:.875rem;color:#d1d5db}
+  </style>
+</head>
+<body class="bg-gray-900 text-white">
+  <canvas id="fluteCanvas"></canvas>
+
+  <h1 class="title-main">Ethereal Flute</h1>
+
+  <div id="start-screen" class="message-box p-6 sm:p-8 rounded-xl ui-panel flex flex-col items-center">
+    <h2 class="text-2xl sm:text-3xl font-bold mb-4 text-center text-cyan-400">Play the Flute!</h2>
+    <button id="startButton" class="start-button">Get Started</button>
+  </div>
+
+  <div id="note-display-container" class="note-display-container">
+    <div id="note-display" class="text-3xl sm:text-4xl font-bold text-teal-400 opacity-0 transition-opacity duration-300"></div>
+  </div>
+
+  <div id="infoMessage" class="info-message"></div>
+  <div id="instructionMessage" class="instruction-message">Click or tap and drag on the screen to play notes!</div>
+
+  <div id="controls-wrapper" class="controls-wrapper hidden">
+    <button id="recordButton" class="control-button record-inactive">Record</button>
+    <button id="stopButton" class="control-button stop-button">Stop</button>
+    <button id="playButton" class="control-button play-button">Play</button>
+    <button id="saveButton" class="control-button save-button">Save</button>
+    <button id="loadButton" class="control-button load-button">Load</button>
+  </div>
+
+  <div id="size-control-container" class="size-control hidden">
+    <label for="sizeSlider" class="size-slider-label">Flute Size</label>
+    <input type="range" id="sizeSlider" min="0.5" max="2.0" step="0.1" value="1.0" class="size-slider"/>
+  </div>
+
+  <div id="modal-container" class="modal">
+    <div class="modal-content" id="modal-content">
+      <h3 class="modal-title" id="modal-title"></h3>
+      <div id="modal-body"></div>
+      <div class="modal-buttons mt-4" id="modal-buttons"></div>
+    </div>
+  </div>
+
+  <script>
+    // --- Global Variables ---
+    let scene, camera, renderer, raycaster, mouse;
+    let flute, fluteHoles = [];
+    let isDragging = false;
+    let previousMousePosition = { x: 0, y: 0 };
+    let activeNotes = new Map();
+    let isRecording = false;
+    let recordedNotes = [];
+    let recordingStartTime = 0;
+    let currentTouchNote = null;
+
+    const canvas = document.getElementById('fluteCanvas');
+    const noteDisplay = document.getElementById('note-display');
+    const startScreen = document.getElementById('start-screen');
+    const controlsWrapper = document.getElementById('controls-wrapper');
+    const infoMessage = document.getElementById('infoMessage');
+    const instructionMessage = document.getElementById('instructionMessage');
+    const recordButton = document.getElementById('recordButton');
+    const stopButton = document.getElementById('stopButton');
+    const playButton = document.getElementById('playButton');
+    const saveButton = document.getElementById('saveButton');
+    const loadButton = document.getElementById('loadButton');
+    const sizeSlider = document.getElementById('sizeSlider');
+    const sizeControlContainer = document.getElementById('size-control-container');
+
+    const modalContainer = document.getElementById('modal-container');
+    const modalTitleEl = document.getElementById('modal-title');
+    const modalBodyEl = document.getElementById('modal-body');
+    const modalButtonsEl = document.getElementById('modal-buttons');
+
+    const notes = ['C5','B4','A4','G4','F4','E4','D4','C4'];
+    const isMobile = window.innerWidth <= 640;
+
+    // --- Tone.js Setup ---
+    const reverb = new Tone.Reverb({ decay: 2, wet: 0.5 }).toDestination();
+    const polySynth = new Tone.PolySynth(Tone.FMSynth, {
+      harmonicity: 3.0,
+      modulationIndex: 10,
+      envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 1.5 },
+      modulation: { type: "triangle" },
+      modulationEnvelope: { attack: 0.5, decay: 0.0, sustain: 1, release: 0.5 }
+    }).connect(reverb);
+
+    // Helper: clamp
+    const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+    // --- Three.js Setup ---
+    let particleSystem, particlePool = [];
+    const particleCount = 200;
+    let starfield;
+    let fluteMaterial, holeMaterial;
+
+    function initThreeJS() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.z = 10;
+
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+      scene.add(ambientLight);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
+      directionalLight.position.set(5,5,5).normalize();
+      scene.add(directionalLight);
+      const pointLight = new THREE.PointLight(0x22d3ee, 0.5, 100);
+      pointLight.position.set(-5,0,5);
+      scene.add(pointLight);
+
+      fluteMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513, metalness: 0.0, roughness: 0.8 });
+      const fluteGroup = new THREE.Group();
+
+      const bodyGeo = new THREE.CylinderGeometry(0.5, 0.5, 12, 64);
+      const bodyMesh = new THREE.Mesh(bodyGeo, fluteMaterial);
+      bodyMesh.rotation.z = Math.PI / 2;
+      fluteGroup.add(bodyMesh);
+
+      flute = fluteGroup;
+      scene.add(flute);
+
+      const holeGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 16);
+      holeMaterial = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, emissive: 0x000000 });
+
+      for (let i = 0; i < notes.length; i++) {
+        const hole = new THREE.Mesh(holeGeo, holeMaterial.clone());
+        hole.rotation.z = Math.PI / 2;
+        hole.position.y = 0.5;
+        hole.position.x = 4.5 - i * 1.5;
+
+        hole.name = `hole-${i}`;
+        hole.userData = { note: notes[i], holeIndex: i, isPlaying: false, start: 0, end: 0, pulse: false, initialScale: new THREE.Vector3(1,1,1) };
+        flute.add(hole);
+        fluteHoles.push(hole);
+      }
+
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
+      const particlesGeometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(particleCount * 3);
+      const colors = new Float32Array(particleCount * 3);
+      const sizes = new Float32Array(particleCount);
+
+      for (let i = 0; i < particleCount; i++) {
+        positions[i*3] = positions[i*3+1] = positions[i*3+2] = 0;
+        colors[i*3] = colors[i*3+1] = colors[i*3+2] = 1;
+        sizes[i] = Math.random() * 0.1 + 0.05;
+
+        particlePool.push({
+          x: 0, y: 0, z: 0,
+          vx: 0, vy: 0, vz: 0,
+          size: sizes[i],
+          life: 0,
+          hue: Math.random(),           // <-- store hue explicitly
+          color: new THREE.Color().setHSL(Math.random(), 1, 0.7),
+          spiralAngle: Math.random() * Math.PI * 2,
+          origin: new THREE.Vector3()
+        });
+      }
+
+      particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      particlesGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+      const particleMaterial = new THREE.PointsMaterial({
+        size: 0.2,
+        sizeAttenuation: true,
+        transparent: true,
+        opacity: 0.8,
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      particleSystem = new THREE.Points(particlesGeometry, particleMaterial);
+      scene.add(particleSystem);
+
+      const starfieldGeometry = new THREE.BufferGeometry();
+      const starVertices = [];
+      for (let i = 0; i < 5000; i++) {
+        const x = THREE.MathUtils.randFloatSpread(200);
+        const y = THREE.MathUtils.randFloatSpread(200);
+        const z = THREE.MathUtils.randFloatSpread(200);
+        starVertices.push(x, y, z);
+      }
+      starfieldGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+      const starfieldMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 });
+      starfield = new THREE.Points(starfieldGeometry, starfieldMaterial);
+      scene.add(starfield);
+    }
+
+    function createParticles(positionObj) {
+      const worldPos = new THREE.Vector3();
+      positionObj.getWorldPosition(worldPos);
+
+      const particlesPerNote = 20;
+      const start = activeNotes.size * particlesPerNote;
+
+      for (let i = 0; i < particlesPerNote; i++) {
+        const particleIndex = (start + i) % particleCount;
+        const p = particlePool[particleIndex];
+
+        p.x = worldPos.x; p.y = worldPos.y; p.z = worldPos.z;
+        p.origin.copy(worldPos);
+
+        const angle = Math.random() * Math.PI * 2;
+        p.vx = Math.cos(angle) * 0.1;
+        p.vy = Math.sin(angle) * 0.1;
+        p.vz = (Math.random() - 0.5) * 0.1;
+
+        p.life = 120;
+        p.hue = Math.random();                 // reset hue
+        p.color.setHSL(p.hue, 1, 0.7);
+        p.spiralAngle = angle;
+      }
+    }
+
+    function updateParticles(pitchBend) {
+      const positions = particleSystem.geometry.attributes.position.array;
+      const colors = particleSystem.geometry.attributes.color.array;
+      const numActiveNotes = activeNotes.size;
+
+      for (let i = 0; i < particlePool.length; i++) {
+        const p = particlePool[i];
+        if (p.life > 0) {
+          p.x += Math.cos(p.spiralAngle) * 0.05 + p.vx;
+          p.y += Math.sin(p.spiralAngle) * 0.05 + p.vy;
+          p.z += p.vz;
+          p.spiralAngle += 0.1;
+          p.life--;
+          p.vx *= 0.98; p.vy *= 0.98; p.vz *= 0.98;
+
+          // update hue safely (0..1)
+          p.hue = (p.hue + pitchBend * 0.1) % 1;
+          if (p.hue < 0) p.hue += 1;
+          p.color.setHSL(p.hue, 1, 0.7);
+
+          const intensityScale = numActiveNotes > 0 ? 1.0 + (numActiveNotes - 1) * 0.2 : 1.0;
+          const finalOpacity = (p.life / 120) * intensityScale;
+
+          colors[i*3]     = p.color.r * finalOpacity;
+          colors[i*3 + 1] = p.color.g * finalOpacity;
+          colors[i*3 + 2] = p.color.b * finalOpacity;
+        }
+        positions[i*3]     = p.x;
+        positions[i*3 + 1] = p.y;
+        positions[i*3 + 2] = p.z;
+      }
+      particleSystem.geometry.attributes.position.needsUpdate = true;
+      particleSystem.geometry.attributes.color.needsUpdate = true;
+    }
+
+    // --- Interaction Handlers ---
+    function onMouseDown(event) {
+      isDragging = true;
+      previousMousePosition.x = event.clientX;
+      previousMousePosition.y = event.clientY;
+
+      if (!isMobile) {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(fluteHoles);
+
+        if (intersects.length > 0) {
+          const clickedObject = intersects[0].object;
+          playNote(clickedObject);
+          instructionMessage.style.opacity = 0;
+        }
+      }
+    }
+
+    function onMouseMove(event) {
+      if (!isDragging) return;
+      const deltaX = event.clientX - previousMousePosition.x;
+      const deltaY = event.clientY - previousMousePosition.y;
+
+      if (activeNotes.size > 0) {
+        const bendFactor = -deltaY * 0.005;
+        // FIX: use detune Signal value (in cents)
+        polySynth.detune.value += bendFactor * 100;
+      } else {
+        flute.rotation.z += deltaX * 0.005;
+        flute.rotation.y += deltaY * 0.005;
+      }
+
+      previousMousePosition.x = event.clientX;
+      previousMousePosition.y = event.clientY;
+    }
+
+    function onMouseUp() {
+      isDragging = false;
+      if (activeNotes.size > 0) {
+        activeNotes.forEach(holeObject => releaseNote(holeObject));
+        activeNotes.clear();
+        // FIX: reset detune via signal
+        polySynth.detune.value = 0;
+        updateNoteDisplay();
+      }
+    }
+
+    function onTouchStart(event) {
+      if (event.touches.length === 1) {
+        isDragging = true;
+        previousMousePosition.x = event.touches[0].clientX;
+        previousMousePosition.y = event.touches[0].clientY;
+        instructionMessage.style.opacity = 0;
+
+        const touchY = event.touches[0].clientY;
+        // FIX: clamp note index
+        const idx = clamp(Math.floor((touchY / window.innerHeight) * notes.length), 0, notes.length - 1);
+        const noteToPlay = notes[idx];
+
+        if (currentTouchNote !== noteToPlay) {
+          if (currentTouchNote) {
+            polySynth.triggerRelease(currentTouchNote);
+            const oldHole = fluteHoles.find(h => h.userData.note === currentTouchNote);
+            if (oldHole) { oldHole.material.emissive.setHex(0x000000); oldHole.userData.pulse = false; }
+          }
+          polySynth.triggerAttack(noteToPlay);
+          const newHole = fluteHoles.find(h => h.userData.note === noteToPlay);
+          if (newHole) { newHole.material.emissive.setHex(0x22d3ee); newHole.userData.pulse = true; }
+          currentTouchNote = noteToPlay;
+          updateNoteDisplay(noteToPlay);
+        }
+      }
+    }
+
+    function onTouchMove(event) {
+      if (!isDragging || event.touches.length !== 1) return;
+      const deltaX = event.touches[0].clientX - previousMousePosition.x;
+      const deltaY = event.touches[0].clientY - previousMousePosition.y;
+
+      if (currentTouchNote) {
+        const bendFactor = -deltaY * 0.005;
+        // FIX: use detune Signal value
+        polySynth.detune.value += bendFactor * 100;
+
+        const touchY = event.touches[0].clientY;
+        const idx = clamp(Math.floor((touchY / window.innerHeight) * notes.length), 0, notes.length - 1);
+        const noteToPlay = notes[idx];
+
+        if (currentTouchNote !== noteToPlay) {
+          polySynth.triggerRelease(currentTouchNote);
+          const oldHole = fluteHoles.find(h => h.userData.note === currentTouchNote);
+          if (oldHole) { oldHole.material.emissive.setHex(0x000000); oldHole.userData.pulse = false; }
+          polySynth.triggerAttack(noteToPlay);
+          const newHole = fluteHoles.find(h => h.userData.note === noteToPlay);
+          if (newHole) { newHole.material.emissive.setHex(0x22d3ee); newHole.userData.pulse = true; }
+          currentTouchNote = noteToPlay;
+          updateNoteDisplay(noteToPlay);
+        }
+      } else {
+        flute.rotation.z += deltaX * 0.005;
+        flute.rotation.y += deltaY * 0.005;
+      }
+
+      previousMousePosition.x = event.touches[0].clientX;
+      previousMousePosition.y = event.touches[0].clientY;
+    }
+
+    function onTouchEnd() {
+      isDragging = false;
+      if (currentTouchNote) {
+        polySynth.triggerRelease(currentTouchNote);
+        const oldHole = fluteHoles.find(h => h.userData.note === currentTouchNote);
+        if (oldHole) { oldHole.material.emissive.setHex(0x000000); oldHole.userData.pulse = false; }
+        currentTouchNote = null;
+        // FIX: reset detune
+        polySynth.detune.value = 0;
+        updateNoteDisplay();
+      }
+    }
+
+    // --- Musical Interaction ---
+    function playNote(holeObject) {
+      const note = holeObject.userData.note;
+      if (!activeNotes.has(note)) {
+        polySynth.triggerAttack(note);
+        activeNotes.set(note, holeObject);
+        createParticles(holeObject);
+        holeObject.material.emissive.setHex(0x22d3ee);
+        holeObject.userData.pulse = true;
+
+        if (isRecording) {
+          recordedNotes.push({ time: Tone.now() - recordingStartTime, note, type: 'start' });
+        }
+        updateNoteDisplay();
+      }
+    }
+
+    function releaseNote(holeObject) {
+      const note = holeObject.userData.note;
+      if (activeNotes.has(note)) {
+        polySynth.triggerRelease(note);
+        activeNotes.delete(note);
+        holeObject.material.emissive.setHex(0x000000);
+        holeObject.userData.pulse = false;
+        holeObject.scale.copy(holeObject.userData.initialScale);
+
+        if (isRecording) {
+          recordedNotes.push({ time: Tone.now() - recordingStartTime, note, type: 'end' });
+        }
+        updateNoteDisplay();
+      }
+    }
+
+    function updateNoteDisplay(note = null) {
+      const notesArray = note ? [note] : Array.from(activeNotes.keys());
+      if (notesArray.length > 0) {
+        noteDisplay.textContent = notesArray.join(', ');
+        noteDisplay.style.opacity = 1;
+      } else {
+        noteDisplay.style.opacity = 0;
+      }
+    }
+
+    // --- Local Storage Data Management ---
+    function showModal(title, content, buttons) {
+      modalContainer.style.display = 'flex';
+      modalTitleEl.textContent = title;
+      modalBodyEl.innerHTML = content;
+      modalButtonsEl.innerHTML = '';
+
+      buttons.forEach(btn => {
+        const buttonEl = document.createElement('button');
+        buttonEl.className = `control-button ${btn.className}`;
+        buttonEl.textContent = btn.text;
+        buttonEl.addEventListener('click', btn.onClick);
+        modalButtonsEl.appendChild(buttonEl);
+      });
+    }
+
+    function hideModal() { modalContainer.style.display = 'none'; }
+
+    function saveRecording(recordingName) {
+      if (recordedNotes.length === 0) { showInfoMessage("Please record a melody first."); return; }
+      try {
+        const recordings = JSON.parse(localStorage.getItem('fluteRecordings')) || {};
+        recordings[recordingName] = recordedNotes;
+        localStorage.setItem('fluteRecordings', JSON.stringify(recordings));
+        showInfoMessage("Recording saved successfully!");
+        hideModal();
+      } catch (error) {
+        console.error("Error saving recording:", error);
+        showInfoMessage("Failed to save recording.");
+      }
+    }
+
+    function deleteRecording(name) {
+      try {
+        const recordings = JSON.parse(localStorage.getItem('fluteRecordings')) || {};
+        delete recordings[name];
+        localStorage.setItem('fluteRecordings', JSON.stringify(recordings));
+        showInfoMessage("Recording deleted.");
+        loadRecordings();
+      } catch (error) {
+        console.error("Error deleting recording:", error);
+        showInfoMessage("Failed to delete recording.");
+      }
+    }
+
+    function loadRecordings() {
+      try {
+        const recordings = JSON.parse(localStorage.getItem('fluteRecordings')) || {};
+        const names = Object.keys(recordings);
+
+        let recordingsHtml = '';
+        if (names.length === 0) {
+          recordingsHtml = `<p class="text-gray-400">No recordings found.</p>`;
+        } else {
+          recordingsHtml = names.map(name => `
+            <div class="list-item" data-name="${name}">
+              <span class="truncate font-bold">${name}</span>
+              <button class="delete-button" data-name="${name}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          `).join('');
+        }
+
+        showModal(
+          'Load Recording',
+          `<div id="recordingsList" class="flex flex-col gap-2 max-h-64 overflow-y-auto">${recordingsHtml}</div>`,
+          [{ text: 'Close', className: 'stop-button', onClick: hideModal }]
+        );
+
+        const listEl = document.getElementById('recordingsList');
+        listEl.addEventListener('click', (event) => {
+          const deleteBtn = event.target.closest('.delete-button');
+          if (deleteBtn) {
+            event.stopPropagation();
+            deleteRecording(deleteBtn.dataset.name);
+            return;
+          }
+          const item = event.target.closest('.list-item');
+          if (item) {
+            const name = item.dataset.name;
+            recordedNotes = recordings[name] || [];
+            hideModal();
+            showInfoMessage(`Recording "${name}" loaded!`);
+          }
+        });
+
+      } catch (e) {
+        console.error("Failed to fetch recordings:", e);
+        showInfoMessage("Error loading recordings.");
+      }
+    }
+
+    function showInfoMessage(message) {
+      infoMessage.textContent = message;
+      infoMessage.style.opacity = 1;
+      setTimeout(() => infoMessage.style.opacity = 0, 3000);
+    }
+
+    // --- Recording and Playback Controls ---
+    recordButton.addEventListener('click', () => {
+      if (!isRecording) {
+        isRecording = true;
+        recordedNotes = [];
+        recordingStartTime = Tone.now();
+        recordButton.classList.remove('record-inactive');
+        recordButton.classList.add('record-active');
+        showInfoMessage("Recording...");
+      }
+    });
+
+    stopButton.addEventListener('click', () => {
+      if (isRecording) {
+        isRecording = false;
+        recordButton.classList.remove('record-active');
+        recordButton.classList.add('record-inactive');
+        showInfoMessage("Recording stopped.");
+      } else {
+        polySynth.releaseAll();
+        Tone.Transport.stop();
+        Tone.Transport.cancel(0);
+        fluteHoles.forEach(hole => { hole.material.emissive.setHex(0x000000); hole.userData.pulse = false; });
+        showInfoMessage("Stopped playback.");
+      }
+    });
+
+    playButton.addEventListener('click', () => {
+      if (recordedNotes.length > 0) {
+        showInfoMessage("Playing...");
+        Tone.Transport.stop();
+        Tone.Transport.cancel(0);
+
+        recordedNotes.forEach(event => {
+          if (event.type === 'start') {
+            Tone.Transport.scheduleOnce(() => {
+              polySynth.triggerAttack(event.note);
+              const hole = fluteHoles.find(h => h.userData.note === event.note);
+              if (hole) { hole.material.emissive.setHex(0x22d3ee); hole.userData.pulse = true; }
+            }, event.time);
+          } else if (event.type === 'end') {
+            Tone.Transport.scheduleOnce(() => {
+              polySynth.triggerRelease(event.note);
+              const hole = fluteHoles.find(h => h.userData.note === event.note);
+              if (hole) { hole.material.emissive.setHex(0x000000); hole.userData.pulse = false; hole.scale.copy(hole.userData.initialScale); }
+            }, event.time);
+          }
+        });
+
+        const lastEvent = recordedNotes[recordedNotes.length - 1];
+        if (lastEvent) {
+          Tone.Transport.scheduleOnce(() => { showInfoMessage("Playback complete."); }, lastEvent.time + 1);
+        }
+        Tone.Transport.start();
+      } else {
+        showInfoMessage("No notes to play. Please record a melody.");
+      }
+    });
+
+    saveButton.addEventListener('click', () => {
+      if (recordedNotes.length === 0) { showInfoMessage("Please record a melody first."); return; }
+      showModal(
+        'Save Recording',
+        `<input type="text" id="recordingNameInput" class="modal-input" placeholder="Enter recording name">`,
+        [
+          { text: 'Cancel', className: 'stop-button', onClick: hideModal },
+          { text: 'Save', className: 'save-button', onClick: () => {
+            const recordingName = document.getElementById('recordingNameInput').value.trim();
+            if (recordingName) saveRecording(recordingName); else showInfoMessage("Please enter a name.");
+          }}
+        ]
+      );
+    });
+
+    loadButton.addEventListener('click', loadRecordings);
+
+    function setupEventListeners() {
+      window.addEventListener('mousedown', onMouseDown, false);
+      window.addEventListener('mousemove', onMouseMove, false);
+      window.addEventListener('mouseup', onMouseUp, false);
+      window.addEventListener('touchstart', onTouchStart, { passive: false });
+      window.addEventListener('touchmove', onTouchMove, { passive: false });
+      window.addEventListener('touchend', onTouchEnd, { passive: false });
+
+      sizeSlider.addEventListener('input', (event) => {
+        const scale = parseFloat(event.target.value);
+        flute.scale.set(scale, scale, scale);
+      });
+    }
+
+    document.getElementById('startButton').addEventListener('click', async () => {
+      await Tone.start();
+      startScreen.style.display = 'none';
+      controlsWrapper.classList.remove('hidden');
+      sizeControlContainer.classList.remove('hidden');
+      setupEventListeners();
+    });
+
+    // --- Animation Loop ---
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const time = Date.now() * 0.001;
+      flute.position.y = Math.sin(time) * 0.2;
+      flute.rotation.x = Math.PI / 2 + Math.sin(time * 0.5) * 0.05;
+
+      if (starfield) {
+        starfield.rotation.y += 0.0002;
+        starfield.rotation.x += 0.0001;
+      }
+
+      if (activeNotes.size > 0) {
+        // detune.value is in cents; scale to a small factor for hue drift
+        const pitchBend = polySynth.detune.value / 100;
+        updateParticles(pitchBend);
+      }
+
+      fluteHoles.forEach(hole => {
+        if (hole.userData.pulse) {
+          const scaleFactor = 1.0 + Math.sin(time * 10) * 0.05;
+          hole.scale.set(scaleFactor, scaleFactor, scaleFactor);
+        }
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    initThreeJS();
+    animate();
+  </script>
+</body>
+</html>
